@@ -51,8 +51,7 @@ contract PodShip is ERC721URIStorage, Ownable {
         uint currentIndex;
         uint currentId;
 
-        for(uint i=0; i<nftCount; ++i)
-        {
+        for(uint i=0; i<nftCount; ++i) {
             currentId = i + 1;
             PodcastNFT storage currentItem = podcastId[currentId];
             nfts[currentIndex] = currentItem;
@@ -66,8 +65,7 @@ contract PodShip is ERC721URIStorage, Ownable {
         uint itemCount = 0;
         uint currentIndex = 0;
         uint currentId;
-        for(uint i=0; i < totalNftCount; i++)
-        {
+        for(uint i=0; i < totalNftCount; i++) {
             if(podcastId[i+1].nftCreator == msg.sender || podcastId[i+1].nftOwner == msg.sender){
                 itemCount += 1;
             }
