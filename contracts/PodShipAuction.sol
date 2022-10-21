@@ -64,10 +64,12 @@ contract PodShipAuction is PodShip {
     }
 
     function deleteAuction(uint256 _auctionId) public {
+        require(msg.sender == podcastId[auctions[_auctionId].podcastId].nftOwner && msg.sender == podcastId[auctions[_auctionId].podcastId].nftCreator, "Only Auction Creator allowed");
         delete auctions[_auctionId];
     }
 
     function withdrawBidsMoney(uint256 _auctionId) public payable {
+        require(msg.sender != bidders[_auctionId].highestBidder, "Aucton Winner cannot withdraw");
         require(!auctions[_auctionId].listed, "Auction still in Progress");
         require(bids[msg.sender] != 0, "User didt participated in the Auction");
         (bool sent, ) = payable(msg.sender).call{value: bids[msg.sender]}("");
