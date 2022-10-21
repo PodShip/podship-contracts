@@ -1,152 +1,93 @@
 // SPDX-License-Identifier: MIT
+pragma solidity 0.8.7;
 
-pragma solidity 0.8.9;
+import "./PodShip.sol";
 
-import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+contract PodShipAuction is PodShip {
+    using Counters for Counters.Counter;
+    Counters.Counter private auctionId;
 
-/**
- * @notice Primary sale auction contract for Cyber Spawn NFTs
- */
-contract PodShipAuction {
-    using Address for address payable;
+    uint256 public immutable platformFee;
+    address public immutable platformFeeRecipient;
 
-    /// @notice Event emitted only on construction. To be used by indexers
-    event PodShipAuctionContractDeployed();
+    constructor(uint256 _platformFee, address _platformFeeRecipient) {
+        platformFee = _platformFee;
+        platformFeeRecipient = _platformFeeRecipient;
+    }
 
-    event PauseToggled(
-        bool isPaused
-    );
-
-    event AuctionCreated(
-        uint256 indexed tokenId
-    );
-
-    event UpdateAuctionEndTime(
-        uint256 indexed tokenId,
-        uint256 endTime
-    );
-
-    event UpdateAuctionStartTime(
-        uint256 indexed tokenId,
-        uint256 startTime
-    );
-
-    event UpdateAuctionReservePrice(
-        uint256 indexed tokenId,
-        uint256 reservePrice
-    );
-
-    event UpdatePlatformFee(
-        uint256 platformFee
-    );
-
-    event UpdatePlatformFeeRecipient(
-        address payable platformFeeRecipient
-    );
-
-    event UpdateMinBidIncrement(
-        uint256 minBidIncrement
-    );
-
-    event BidPlaced(
-        uint256 indexed tokenId,
-        address indexed bidder,
-        uint256 bid
-    );
-
-    event BidWithdrawn(
-        uint256 indexed tokenId,
-        address indexed bidder,
-        uint256 bid
-    );
-
-    event BidRefunded(
-        address indexed bidder,
-        uint256 bid
-    );
-
-    event AuctionResulted(
-        uint256 indexed tokenId,
-        address indexed winner,
-        uint256 winningBid
-    );
-
-    event AuctionCancelled(
-        uint256 indexed tokenId
-    );
-
-    /// @notice Parameters of an auction
     struct Auction {
+        uint256 podcastId;
         uint256 reservePrice;
         uint256 startTime;
         uint256 endTime;
-        bool resulted;
+        bool listed;
+        // uint256 royalty;
     }
 
-    /// @notice Information about the sender that placed a bit on an auction
-    struct HighestBid {
-        address payable bidder;
-        uint256 bid;
-        uint256 lastBidTime;
+    struct Bidding {
+        address highestBidder;
+        uint256 highestBid;
     }
 
-    /// @notice NFT Token ID -> Auction Parameters
     mapping(uint256 => Auction) public auctions;
+    mapping(uint256 => Bidding) public bidders;
+    mapping(address => uint) public bids;
+    
 
-    /// @notice NFT Token ID -> highest bidder info (if a bid has been received)
-    mapping(uint256 => HighestBid) public highestBids;
-
-    /// @notice NFT - the only NFT that can be auctioned in this contract
-    IERC721 public PodShipNft;
-
-    /// @notice globally and across all auctions, the amount by which a bid has to increase
-    uint256 public minBidIncrement = 0.1 ether;
-
-    /// @notice global platform fee, assumed to always be to 1 decimal place i.e. 20 = 2.0%
-    uint256 public platformFee = 20;
-
-    /// @notice where to send platform fee funds to
-    address payable public platformFeeRecipient;
-
-    /// @notice for switching off auction creations, bids and withdrawals
-    bool public isPaused;
-
-    modifier whenNotPaused() {
-        require(!isPaused, "Function is currently paused");
-        _;
+    function startAuction(uint256 _podcastId, uint256 _reservePrice, uint256 _startTime, uint256 _endTime) public returns(uint256) {
+        require(msg.sender == ownerOf(_podcastId), "only NFT Owner can start the Auction");
+        require(!podcastId[_podcastId].listed, "NFT already on Auction");
+        auctionId.increment();
+        podcastId[_podcastId].listed = true;
+        approve(address(this), 1);
+        auctions[auctionId.current()] = Auction(_podcastId, _reservePrice, _startTime, _endTime, true);
+        return auctionId.current();
     }
 
-    constructor(
-        IERC721 _PodShipNft,
-        address payable _platformFeeRecipient
-    ) public {
-        
-        
-        require(address(_PodShipNft) != address(0), "PodNFTAuction: Invalid NFT");
-        require(_platformFeeRecipient != address(0), "NFTAuction: Invalid Platform Fee Recipient");
-
-        PodShipNft = _PodShipNft;
-        platformFeeRecipient = _platformFeeRecipient;
-
-        emit PodShipAuctionContractDeployed();
+    function bid(uint256 _auctionId) public payable {
+        require(!isContract(msg.sender), "only EOA allowed");
+        require(auctions[_auctionId].listed, "NFT not on Auction");
+        require(block.timestamp > auctions[_auctionId].startTime, "Auction not started yet");
+        require(block.timestamp < auctions[_auctionId].endTime, "Auction Ended");
+        require(msg.value > auctions[_auctionId].reservePrice && msg.value > bidders[_auctionId].highestBid, "Input amount below NFT's reservePrice or last Bid");
+        if (msg.sender != address(0)) {
+            bids[msg.sender] += msg.value;
+        }
+        bidders[_auctionId].highestBidder = msg.sender;
+        bidders[_auctionId].highestBid = msg.value;
     }
 
-// next functionality
+    function endAuction(uint256 _auctionId, uint256 _podcastId) public payable {
+        require(auctions[_auctionId].listed, "NFT not on Auction");
+        require(block.timestamp > auctions[_auctionId].endTime, "Auction In Progress");
+        require(msg.sender == podcastId[_podcastId].nftOwner || msg.sender == bidders[_auctionId].highestBidder, "Only Auction Creator & Winner allowed");
+        podcastId[_podcastId].listed = false;
+        safeTransferFrom(podcastId[_podcastId].nftOwner, bidders[_auctionId].highestBidder, podcastId[_podcastId].tokenId);
+        (bool success, ) = (podcastId[_podcastId].nftOwner).call{value: bidders[_auctionId].highestBid}("");
+        require(success, "NFT Tranfership Failed");
+    }
 
-// Create Auction Method => visibility public
+    function deleteAuction(uint256 _auctionId) public {
+        delete auctions[_auctionId];
+    }
 
-// Get Auction => visibility public
+    function withdrawBids(uint256 _podcastId) public payable {
+        require(!podcastId[_podcastId].listed, "Auction still in Progress");
+        require(bids[msg.sender] != 0, "User didt participated in the Auction");
+        (bool sent, ) = payable(msg.sender).call{value: bids[msg.sender]}("");
+        require(sent, "Withdraw Failed");
+    }
 
-// Update Auction End time and start Time
+    // function testNavich() public view returns(uint256) {
+    //     return bids[msg.sender];
+    // }
 
-// Place Bid function
+    function isContract(address account) internal view returns (bool) {
+        uint size;
+        assembly {
+            size := extcodesize(account)
+        }
+        return size > 0;
+    }
 
-// Auction resolution => Highest Bidder gets pod cast
-
-// Cancel Auction
-
-// Withdraw bid
-
-// ... more access Control functionalities
 }
