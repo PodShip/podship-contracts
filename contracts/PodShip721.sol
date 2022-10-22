@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.9;
+pragma solidity ^0.8.9;
 
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -20,7 +20,7 @@ contract PodShip is ERC721URIStorage, Ownable {
 
     mapping(uint256 => PodcastNFT) public podcastId;
 
-    constructor() ERC721("PodShip Podcast NFT", "PODSHIP") {}
+    constructor() ERC721("PodShip Podcast NFT", "'") {}
 
     function mintNFT(string memory ipfsURI) external {
 
@@ -45,43 +45,43 @@ contract PodShip is ERC721URIStorage, Ownable {
         require(sent, "Failed to send MATIC");
     }
 
-    function getAllNFTs() public view returns (PodcastNFT[] memory) {
-        uint nftCount = _tokenId.current();
-        PodcastNFT[] memory nfts = new PodcastNFT[](nftCount);
-        uint currentIndex;
-        uint currentId;
+    // function getAllNFTs() public view returns (PodcastNFT[] memory) {
+    //     uint nftCount = _tokenId.current();
+    //     PodcastNFT[] memory nfts = new PodcastNFT[](nftCount);
+    //     uint currentIndex;
+    //     uint currentId;
 
-        for(uint i=0; i<nftCount; ++i) {
-            currentId = i + 1;
-            PodcastNFT storage currentItem = podcastId[currentId];
-            nfts[currentIndex] = currentItem;
-            currentIndex += 1;
-        }
-        return nfts;
-    }
+    //     for(uint i=0; i<nftCount; ++i) {
+    //         currentId = i + 1;
+    //         PodcastNFT storage currentItem = podcastId[currentId];
+    //         nfts[currentIndex] = currentItem;
+    //         currentIndex += 1;
+    //     }
+    //     return nfts;
+    // }
 
-    function getMyNFTs() public view returns (PodcastNFT[] memory) {
-        uint totalNftCount = _tokenId.current();
-        uint itemCount = 0;
-        uint currentIndex = 0;
-        uint currentId;
-        for(uint i=0; i < totalNftCount; i++) {
-            if(podcastId[i+1].nftCreator == msg.sender || podcastId[i+1].nftOwner == msg.sender){
-                itemCount += 1;
-            }
-        }
+    // function getMyNFTs() public view returns (PodcastNFT[] memory) {
+    //     uint totalNftCount = _tokenId.current();
+    //     uint itemCount = 0;
+    //     uint currentIndex = 0;
+    //     uint currentId;
+    //     for(uint i=0; i < totalNftCount; i++) {
+    //         if(podcastId[i+1].nftCreator == msg.sender || podcastId[i+1].nftOwner == msg.sender){
+    //             itemCount += 1;
+    //         }
+    //     }
 
-        PodcastNFT[] memory items = new PodcastNFT[](itemCount);
-        for(uint i=0; i < totalNftCount; i++) {
-            if(podcastId[i+1].nftCreator == msg.sender || podcastId[i+1].nftOwner == msg.sender){
-                currentId = i+1;
-                PodcastNFT storage currentItem = podcastId[currentId];
-                items[currentIndex] = currentItem;
-                currentIndex += 1;
-            }
-        }
-        return items;
-    }
+    //     PodcastNFT[] memory items = new PodcastNFT[](itemCount);
+    //     for(uint i=0; i < totalNftCount; i++) {
+    //         if(podcastId[i+1].nftCreator == msg.sender || podcastId[i+1].nftOwner == msg.sender){
+    //             currentId = i+1;
+    //             PodcastNFT storage currentItem = podcastId[currentId];
+    //             items[currentIndex] = currentItem;
+    //             currentIndex += 1;
+    //         }
+    //     }
+    //     return items;
+    // }
 
     function getNftCreator(uint256 _podcastID) public view returns(address) {
         return podcastId[_podcastID].nftCreator;
@@ -97,6 +97,10 @@ contract PodShip is ERC721URIStorage, Ownable {
 
     function getCurrentToken() public view returns (uint256) {
         return _tokenId.current();
+    }
+
+    function fetchTokenURI(uint256 _nftTokenId) public view returns (string memory) {
+        return super.tokenURI(_nftTokenId);
     }
 
 }
