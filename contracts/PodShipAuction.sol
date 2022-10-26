@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.7;
 
+// 0x0000000000000000000000000000000000000000000000000000000000000005
+
 import "./PodShip.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -97,36 +99,61 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, AutomationCompatible, Reen
     }
 
     function checkUpkeep(bytes calldata /* checkData */) external view override returns(bool upkeepNeeded, bytes memory performData) {
-        // for(uint i=0; i > auctionIDs.length; i++){
         for(uint i=0; i < auctionIDs.length; i++){
-            if(auctions[auctionIDs[i]].startTime != 0 && block.timestamp > auctions[auctionIDs[i]].endTime ){
+            if(auctions[auctionIDs[i]].endTime != 0 && block.timestamp > auctions[auctionIDs[i]].endTime){
                 upkeepNeeded = true;
                 performData = abi.encodePacked(uint256(auctionIDs[i]));
             }
         }
         return (upkeepNeeded, performData);
-    } ///// ALHUMDULILAH                                               
+    }
 
     function performUpkeep(bytes calldata performData) external override nonReentrant {
         uint256 auction_id = abi.decode(performData, (uint256));
 
-        auctions[auction_id].listed = false;
+        if(auctions[auction_id].endTime != 0 && block.timestamp > auctions[auction_id].endTime){
 
-        safeTransferFrom(podcastId[auctions[auction_id].podcastId].nftOwner, bidders[auction_id].highestBidder, podcastId[auctions[auction_id].podcastId].tokenId);
+            auctions[auction_id].listed = false;
 
-        uint256 platformCut = (platformFee * bidders[auction_id].highestBid)/100;
-        uint256 NftOwnerCut = bidders[auction_id].highestBid - platformCut;
+            safeTransferFrom(podcastId[auctions[auction_id].podcastId].nftOwner, bidders[auction_id].highestBidder, podcastId[auctions[auction_id].podcastId].tokenId);
 
-        (bool pass, ) = platformFeeRecipient.call{value: platformCut}("");
-        require(pass, "platformFee Transfer failed");
-        (bool success, ) = (podcastId[auctions[auction_id].podcastId].nftOwner).call{value: NftOwnerCut}("");
-        require(success, "NftOwnerCut Transfer Failed");
+            uint256 platformCut = (platformFee * bidders[auction_id].highestBid)/100;
+            uint256 NftOwnerCut = bidders[auction_id].highestBid - platformCut;
 
-        podcastId[auctions[auction_id].podcastId].nftOwner = bidders[auction_id].highestBidder;
-        emit AuctionResulted(auction_id, bidders[auction_id].highestBidder, bidders[auction_id].highestBid);
-        bidders[auction_id].highestBid = 0;
-        auctions[auction_id].startTime = 0;
+            (bool pass, ) = platformFeeRecipient.call{value: platformCut}("");
+            require(pass, "platformFee Transfer failed");
+            (bool success, ) = (podcastId[auctions[auction_id].podcastId].nftOwner).call{value: NftOwnerCut}("");
+            require(success, "NftOwnerCut Transfer Failed");
+
+            podcastId[auctions[auction_id].podcastId].nftOwner = bidders[auction_id].highestBidder;
+            emit AuctionResulted(auction_id, bidders[auction_id].highestBidder, bidders[auction_id].highestBid);
+            bidders[auction_id].highestBid = 0;
+            auctions[auction_id].endTime = 0;
+            
+        }
+
     }
+
+    // function performUpkeep(bytes calldata performData) external override nonReentrant {
+    //     uint256 auction_id = abi.decode(performData, (uint256));
+
+    //     auctions[auction_id].listed = false;
+
+    //     safeTransferFrom(podcastId[auctions[auction_id].podcastId].nftOwner, bidders[auction_id].highestBidder, podcastId[auctions[auction_id].podcastId].tokenId);
+
+    //     uint256 platformCut = (platformFee * bidders[auction_id].highestBid)/100;
+    //     uint256 NftOwnerCut = bidders[auction_id].highestBid - platformCut;
+
+    //     (bool pass, ) = platformFeeRecipient.call{value: platformCut}("");
+    //     require(pass, "platformFee Transfer failed");
+    //     (bool success, ) = (podcastId[auctions[auction_id].podcastId].nftOwner).call{value: NftOwnerCut}("");
+    //     require(success, "NftOwnerCut Transfer Failed");
+
+    //     podcastId[auctions[auction_id].podcastId].nftOwner = bidders[auction_id].highestBidder;
+    //     emit AuctionResulted(auction_id, bidders[auction_id].highestBidder, bidders[auction_id].highestBid);
+    //     bidders[auction_id].highestBid = 0;
+    //     auctions[auction_id].endTime = 0;
+    // }
 
     function cancelAuction(uint256 _auctionId) public {
         require(msg.sender == podcastId[auctions[_auctionId].podcastId].nftOwner && msg.sender == podcastId[auctions[_auctionId].podcastId].nftCreator, "Only Auction Creator allowed");
@@ -150,6 +177,11 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, AutomationCompatible, Reen
 
     function changePlatformFeeRecipient(address _platformFeeRecipient) external onlyOwner {
         platformFeeRecipient = _platformFeeRecipient;
+    }
+
+    function withdraw() external onlyOwner payable {
+        (bool withdrawn, ) = payable(owner()).call{value: address(this).balance}("");
+        require(withdrawn, "Withdraw Failed");
     }
 
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC2981, ERC721) returns (bool) {
