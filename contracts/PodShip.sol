@@ -45,44 +45,6 @@ contract PodShip is ERC721URIStorage, Ownable {
         require(sent, "Failed to send MATIC");
     }
 
-    function getAllNFTs() public view returns (PodcastNFT[] memory) {
-        uint nftCount = _tokenId.current();
-        PodcastNFT[] memory nfts = new PodcastNFT[](nftCount);
-        uint currentIndex;
-        uint currentId;
-
-        for(uint i=0; i<nftCount; ++i) {
-            currentId = i + 1;
-            PodcastNFT storage currentItem = podcastId[currentId];
-            nfts[currentIndex] = currentItem;
-            currentIndex += 1;
-        }
-        return nfts;
-    }
-
-    function getMyNFTs() public view returns (PodcastNFT[] memory) {
-        uint totalNftCount = _tokenId.current();
-        uint itemCount = 0;
-        uint currentIndex = 0;
-        uint currentId;
-        for(uint i=0; i < totalNftCount; i++) {
-            if(podcastId[i+1].nftCreator == msg.sender || podcastId[i+1].nftOwner == msg.sender){
-                itemCount += 1;
-            }
-        }
-
-        PodcastNFT[] memory items = new PodcastNFT[](itemCount);
-        for(uint i=0; i < totalNftCount; i++) {
-            if(podcastId[i+1].nftCreator == msg.sender || podcastId[i+1].nftOwner == msg.sender){
-                currentId = i+1;
-                PodcastNFT storage currentItem = podcastId[currentId];
-                items[currentIndex] = currentItem;
-                currentIndex += 1;
-            }
-        }
-        return items;
-    }
-
     function getNftCreator(uint256 _podcastID) public view returns(address) {
         return podcastId[_podcastID].nftCreator;
     }

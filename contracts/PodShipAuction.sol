@@ -4,9 +4,9 @@ pragma solidity 0.8.9;
 import "./PodShip.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@chainlink/contracts/src/v0.8//interfaces/AutomationCompatibleInterface.sol";
+import "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
 
-contract PodShipAuction is Ownable, PodShip, ERC2981, AutomationCompatibleInterface, ReentrancyGuard {
+contract PodShipAuction is Ownable, PodShip, ERC2981, AutomationCompatible, ReentrancyGuard {
     using Counters for Counters.Counter;
     Counters.Counter private auctionId;
     
