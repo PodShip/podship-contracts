@@ -30,6 +30,12 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
     event AuctionCancelled(
         uint256 indexed auctionId
     );
+    event PlatformFeeChanged(
+        uint256 indexed platformFee
+    );
+    event PlatformFeeRecipientChanged(
+        address indexed platformFeeRecipient
+    );
     event BidRefunded(
         uint256 indexed auctionId,
         address indexed bidder,
@@ -100,19 +106,14 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
         if(!auctions[_auctionId].listed){ revert PodShipAuction__NftNotOnAuction(); }
         if(msg.sender != podcastId[auctions[_auctionId].podcastId].nftOwner){ revert PodShipAuction__OnlyNftOwnerAllowed(); }
         if(block.timestamp < auctions[_auctionId].endTime) { revert PodShipAuction__AuctionInProgress(); }
-
         auctions[_auctionId].listed = false;
-
         safeTransferFrom(podcastId[auctions[_auctionId].podcastId].nftOwner, bidders[_auctionId].highestBidder, podcastId[auctions[_auctionId].podcastId].tokenId);
-
         uint256 platformCut = (platformFee * bidders[_auctionId].highestBid)/100;
         uint256 NftOwnerCut = bidders[_auctionId].highestBid - platformCut;
-
         (bool pass, ) = platformFeeRecipient.call{value: platformCut}("");
         if(!pass){ revert PodShipAuction__platformFeeTransferFailed(); }
         (bool success, ) = (podcastId[auctions[_auctionId].podcastId].nftOwner).call{value: NftOwnerCut}("");
         if(!success){ revert PodShipAuction__NftOwnerCutTransferFailed(); }
-
         podcastId[auctions[_auctionId].podcastId].nftOwner = bidders[_auctionId].highestBidder;
         emit AuctionResulted(_auctionId, bidders[_auctionId].highestBidder, bidders[_auctionId].highestBid);
         bidders[_auctionId].highestBid = 0;
@@ -135,10 +136,12 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
 
     function changePlatformFee(uint256 _platformFee) external onlyOwner {
         platformFee = _platformFee;
+        emit PlatformFeeChanged(_platformFee);
     }
 
     function changePlatformFeeRecipient(address _platformFeeRecipient) external onlyOwner {
         platformFeeRecipient = _platformFeeRecipient;
+        emit PlatformFeeRecipientChanged(_platformFeeRecipient);
     }
 
     function withdraw() external onlyOwner payable {
