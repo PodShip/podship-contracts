@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
 
-contract PodShipAuction is Ownable, PodShip, ERC2981, AutomationCompatible, ReentrancyGuard {
+contract PodShipAuction is Ownable, PodShip, ERC2981, /*AutomationCompatible,*/ ReentrancyGuard {
     using Counters for Counters.Counter;
     Counters.Counter private auctionId;
     
@@ -72,7 +72,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, AutomationCompatible, Reen
         auctionId.increment();
         approve(address(this), podcastId[_podcastId].tokenId);
         // uint256 auction_duration = _duration * 86400; ///// For Mainnet
-        uint256 auction_duration = _duration * 60;       ///// For testnet/stesting
+        uint256 auction_duration = _duration * 60;       ///// For testnet/testing
         _setTokenRoyalty(podcastId[_podcastId].tokenId, podcastId[_podcastId].nftCreator, _royaltyPercent);
         auctions[auctionId.current()] = Auction(_podcastId, _reservePrice * 10**18, 0, 0, auction_duration, _royaltyPercent, true);
         emit AuctionCreated(auctionId.current(), _reservePrice * 10**18, _royaltyPercent, _podcastId, auction_duration);
@@ -96,46 +96,32 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, AutomationCompatible, Reen
         emit BidPlaced(_auctionId, msg.sender, msg.value);
     }
 
-    function checkUpkeep(bytes calldata /* checkData */) external view override returns(bool upkeepNeeded, bytes memory performData) {
-        for(uint i=0; i < auctionIDs.length; i++){
-            if(auctions[auctionIDs[i]].endTime != 0 && block.timestamp > auctions[auctionIDs[i]].endTime){
-                upkeepNeeded = true;
-                performData = abi.encodePacked(uint256(auctionIDs[i]));
-            }
-        }
-        return (upkeepNeeded, performData);
-    }
+    function endAuction(uint256 _auctionId) public nonReentrant {
+        require(auctions[_auctionId].listed, "NFT not on Auction");
+        require(msg.sender == podcastId[auctions[_auctionId].podcastId].nftOwner, "Only NFT Owner allowed");
+        require(block.timestamp > auctions[_auctionId].endTime, "Auction In Progress");
 
-    function performUpkeep(bytes calldata performData) external override nonReentrant {
-        uint256 auction_id = abi.decode(performData, (uint256));
+        auctions[_auctionId].listed = false;
 
-        if(auctions[auction_id].endTime != 0 && block.timestamp > auctions[auction_id].endTime){
+        safeTransferFrom(podcastId[auctions[_auctionId].podcastId].nftOwner, bidders[_auctionId].highestBidder, podcastId[auctions[_auctionId].podcastId].tokenId);
 
-            auctions[auction_id].listed = false;
+        uint256 platformCut = (platformFee * bidders[_auctionId].highestBid)/100;
+        uint256 NftOwnerCut = bidders[_auctionId].highestBid - platformCut;
 
-            safeTransferFrom(podcastId[auctions[auction_id].podcastId].nftOwner, bidders[auction_id].highestBidder, podcastId[auctions[auction_id].podcastId].tokenId);
+        (bool pass, ) = platformFeeRecipient.call{value: platformCut}("");
+        require(pass, "platformFee Transfer failed");
+        (bool success, ) = (podcastId[auctions[_auctionId].podcastId].nftOwner).call{value: NftOwnerCut}("");
+        require(success, "NftOwnerCut Transfer Failed");
 
-            uint256 platformCut = (platformFee * bidders[auction_id].highestBid)/100;
-            uint256 NftOwnerCut = bidders[auction_id].highestBid - platformCut;
-
-            (bool pass, ) = platformFeeRecipient.call{value: platformCut}("");
-            require(pass, "platformFee Transfer failed");
-            (bool success, ) = (podcastId[auctions[auction_id].podcastId].nftOwner).call{value: NftOwnerCut}("");
-            require(success, "NftOwnerCut Transfer Failed");
-
-            podcastId[auctions[auction_id].podcastId].nftOwner = bidders[auction_id].highestBidder;
-            emit AuctionResulted(auction_id, bidders[auction_id].highestBidder, bidders[auction_id].highestBid);
-            bidders[auction_id].highestBid = 0;
-            auctions[auction_id].endTime = 0;
-            
-        }
-
+        podcastId[auctions[_auctionId].podcastId].nftOwner = bidders[_auctionId].highestBidder;
+        emit AuctionResulted(_auctionId, bidders[_auctionId].highestBidder, bidders[_auctionId].highestBid);
+        bidders[_auctionId].highestBid = 0;
+        auctions[_auctionId].endTime = 0;
     }
 
     function cancelAuction(uint256 _auctionId) public {
         require(msg.sender == podcastId[auctions[_auctionId].podcastId].nftOwner && msg.sender == podcastId[auctions[_auctionId].podcastId].nftCreator, "Only Auction Creator allowed");
         delete auctions[_auctionId];
-        // delete _tokenApprovals[podcastId[auctions[_auctionId].podcastId].tokenId];
         emit AuctionCancelled(_auctionId);
     }
 
