@@ -2,6 +2,7 @@
 pragma solidity 0.8.9;
 
 import "./PodShip.sol";
+import "./PodShipErrors.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
@@ -32,7 +33,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
     event BidRefunded(
         uint256 indexed auctionId,
         address indexed bidder,
-        uint256 indexed bid
+        uint256 bid
     );
     
     uint256 public platformFee;
@@ -63,10 +64,10 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
     mapping(address => uint) public bids;
 
     function startAuction(uint256 _podcastId, uint256 _reservePrice, uint256 _duration, uint96 _royaltyPercent) public returns(uint256) {
-        require(msg.sender == ownerOf(_podcastId), "only NFT Owner can start the Auction");
-        require(_duration >= 1 && _duration <= 7, "Auction duration can be between 1-7 Days");
-        require(_royaltyPercent >= 1 && _royaltyPercent <= 50, "NFT Royalties should be 1-50 percent");
-        require(_reservePrice >= 1, "Reserve Price cannot be Zero");
+        if(msg.sender != ownerOf(_podcastId)){ revert PodShipAuction__OnlyNftOwnerCanStartTheAuction(); }
+        if(_duration < 1 && _duration > 7){ revert PodShipAuction__AuctionDuration_1to7_DaysAllowed(); }
+        if(_royaltyPercent < 1 && _royaltyPercent > 50){ revert PodShipAuction__NftRoyalties_1to50_PercentAllowed(); }
+        if(_reservePrice < 1){ revert PodShipAuction__ReservePriceZeroNotAllowed(); }
         auctionId.increment();
         approve(address(this), podcastId[_podcastId].tokenId);
         // uint256 auction_duration = _duration * 86400; ///// For Mainnet
@@ -78,13 +79,15 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
     }
 
     function bid(uint256 _auctionId) public payable {
-        require(auctions[_auctionId].listed, "NFT not on Auction");
+        if(!auctions[_auctionId].listed){ revert PodShipAuction__NftNotOnAuction(); }
         if(bidders[_auctionId].highestBidder == address(0)) {
             auctions[_auctionId].startTime = block.timestamp;
         }
         auctions[_auctionId].endTime = auctions[_auctionId].startTime + auctions[_auctionId].duration;
-        require(block.timestamp < auctions[_auctionId].endTime, "Auction Ended");
-        require(msg.value > auctions[_auctionId].reservePrice && msg.value > bidders[_auctionId].highestBid, "Input amount below NFT's reservePrice or last Bid");
+        if(block.timestamp > auctions[_auctionId].endTime){ revert PodShipAuction__AuctionEnded(); }
+        if(msg.value < auctions[_auctionId].reservePrice && msg.value < bidders[_auctionId].highestBid){
+            revert PodShipAuction__InputAmountBelowNftReservePriceOrLastHighestBid();
+        }
         if (msg.sender != address(0)) {
             bids[msg.sender] += msg.value;
         }
@@ -94,9 +97,9 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
     }
 
     function endAuction(uint256 _auctionId) public nonReentrant {
-        require(auctions[_auctionId].listed, "NFT not on Auction");
-        require(msg.sender == podcastId[auctions[_auctionId].podcastId].nftOwner, "Only NFT Owner allowed");
-        require(block.timestamp > auctions[_auctionId].endTime, "Auction In Progress");
+        if(!auctions[_auctionId].listed){ revert PodShipAuction__NftNotOnAuction(); }
+        if(msg.sender != podcastId[auctions[_auctionId].podcastId].nftOwner){ revert PodShipAuction__OnlyNftOwnerAllowed(); }
+        if(block.timestamp < auctions[_auctionId].endTime) { revert PodShipAuction__AuctionInProgress(); }
 
         auctions[_auctionId].listed = false;
 
@@ -106,9 +109,9 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
         uint256 NftOwnerCut = bidders[_auctionId].highestBid - platformCut;
 
         (bool pass, ) = platformFeeRecipient.call{value: platformCut}("");
-        require(pass, "platformFee Transfer failed");
+        if(!pass){ revert PodShipAuction__platformFeeTransferFailed(); }
         (bool success, ) = (podcastId[auctions[_auctionId].podcastId].nftOwner).call{value: NftOwnerCut}("");
-        require(success, "NftOwnerCut Transfer Failed");
+        if(!success){ revert PodShipAuction__NftOwnerCutTransferFailed(); }
 
         podcastId[auctions[_auctionId].podcastId].nftOwner = bidders[_auctionId].highestBidder;
         emit AuctionResulted(_auctionId, bidders[_auctionId].highestBidder, bidders[_auctionId].highestBid);
@@ -117,16 +120,16 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
     }
 
     function cancelAuction(uint256 _auctionId) public {
-        require(msg.sender == podcastId[auctions[_auctionId].podcastId].nftOwner && msg.sender == podcastId[auctions[_auctionId].podcastId].nftCreator, "Only Auction Creator allowed");
+        if(msg.sender != podcastId[auctions[_auctionId].podcastId].nftOwner && msg.sender != podcastId[auctions[_auctionId].podcastId].nftCreator){ revert PodShipAuction__OnlyAuctionCreatorAllowed(); }
         delete auctions[_auctionId];
         emit AuctionCancelled(_auctionId);
     }
 
     function refundBid(uint256 _auctionId) public payable {
-        require(msg.sender != bidders[_auctionId].highestBidder, "Aucton Winner cannot withdraw");
-        require(bids[msg.sender] != 0, "User didn't participated in the Auction");
+        if(msg.sender == bidders[_auctionId].highestBidder){ revert PodShipAuction__AuctonWinnerCannotWithdraw();}
+        if(bids[msg.sender] == 0){ revert PodShipAuction__UserDidNotParticipatedInTheAuction(); }
         (bool sent, ) = payable(msg.sender).call{value: bids[msg.sender]}("");
-        require(sent, "Withdraw Failed");
+        if(!sent){ revert PodShipAuction__WithdrawFailed(); }
         emit BidRefunded(_auctionId, msg.sender, bids[msg.sender]);
     }
 
@@ -140,7 +143,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
 
     function withdraw() external onlyOwner payable {
         (bool withdrawn, ) = payable(owner()).call{value: address(this).balance}("");
-        require(withdrawn, "Withdraw Failed");
+        if(!withdrawn){revert PodShipAuction__WithdrawFailed(); }
     }
 
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC2981, ERC721) returns (bool) {
