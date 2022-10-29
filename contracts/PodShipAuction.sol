@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.9;
+pragma solidity 0.8.7;
 
 import "./PodShip.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
@@ -62,7 +62,6 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, /*AutomationCompatible,*/ 
     mapping(uint256 => Auction) public auctions;
     mapping(uint256 => Bidding) public bidders;
     mapping(address => uint) public bids;
-    uint256[] public auctionIDs;
 
     function startAuction(uint256 _podcastId, uint256 _reservePrice, uint256 _duration, uint96 _royaltyPercent) public returns(uint256) {
         require(msg.sender == ownerOf(_podcastId), "only NFT Owner can start the Auction");
@@ -76,7 +75,6 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, /*AutomationCompatible,*/ 
         _setTokenRoyalty(podcastId[_podcastId].tokenId, podcastId[_podcastId].nftCreator, _royaltyPercent);
         auctions[auctionId.current()] = Auction(_podcastId, _reservePrice * 10**18, 0, 0, auction_duration, _royaltyPercent, true);
         emit AuctionCreated(auctionId.current(), _reservePrice * 10**18, _royaltyPercent, _podcastId, auction_duration);
-        auctionIDs.push(auctionId.current());
         return auctionId.current();
     }
 
