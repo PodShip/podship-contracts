@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.7;
+pragma solidity 0.8.9;
 
 import "./PodShip.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
 
-contract PodShipAuction is Ownable, PodShip, ERC2981, /*AutomationCompatible,*/ ReentrancyGuard {
+contract PodShipAuction is PodShip, ERC2981, AutomationCompatible, ReentrancyGuard {
     using Counters for Counters.Counter;
     Counters.Counter private auctionId;
     
@@ -31,9 +31,12 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, /*AutomationCompatible,*/ 
         uint256 indexed auctionId
     );
     event BidRefunded(
-        uint256 indexed auctionId,
         address indexed bidder,
-        uint256 bid
+        uint256 indexed bid
+    );
+    event RefunderPunished(
+        address indexed puishmentRefundedTo,
+        uint256 indexed punishedFund
     );
     
     uint256 public platformFee;
@@ -63,6 +66,8 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, /*AutomationCompatible,*/ 
     mapping(uint256 => Bidding) public bidders;
     mapping(address => uint) public bids;
 
+    address[] public allBidders;
+
     function startAuction(uint256 _podcastId, uint256 _reservePrice, uint256 _duration, uint96 _royaltyPercent) public returns(uint256) {
         require(msg.sender == ownerOf(_podcastId), "only NFT Owner can start the Auction");
         require(_duration >= 1 && _duration <= 7, "Auction duration can be between 1-7 Days");
@@ -79,6 +84,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, /*AutomationCompatible,*/ 
     }
 
     function bid(uint256 _auctionId) public payable {
+        require(!isContract(msg.sender), "only EOA allowed");
         require(auctions[_auctionId].listed, "NFT not on Auction");
         if(bidders[_auctionId].highestBidder == address(0)) {
             auctions[_auctionId].startTime = block.timestamp;
@@ -91,6 +97,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, /*AutomationCompatible,*/ 
         }
         bidders[_auctionId].highestBidder = msg.sender;
         bidders[_auctionId].highestBid = msg.value;
+        allBidders.push(msg.sender);
         emit BidPlaced(_auctionId, msg.sender, msg.value);
     }
 
@@ -123,12 +130,43 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, /*AutomationCompatible,*/ 
         emit AuctionCancelled(_auctionId);
     }
 
-    function refundBid(uint256 _auctionId) public payable {
-        require(msg.sender != bidders[_auctionId].highestBidder, "Aucton Winner cannot withdraw");
-        require(bids[msg.sender] != 0, "User didn't participated in the Auction");
-        (bool sent, ) = payable(msg.sender).call{value: bids[msg.sender]}("");
-        require(sent, "Withdraw Failed");
-        emit BidRefunded(_auctionId, msg.sender, bids[msg.sender]);
+    // function refundBid(uint256 _auctionId) public payable {
+    //     require(msg.sender != bidders[_auctionId].highestBidder, "Aucton Winner cannot withdraw");
+    //     require(bids[msg.sender] != 0, "User didn't participated in the Auction");
+    //     (bool sent, ) = payable(msg.sender).call{value: bids[msg.sender]}("");
+    //     require(sent, "Withdraw Failed");
+    //     emit BidRefunded(_auctionId, msg.sender, bids[msg.sender]);
+    // }
+
+    function checkUpkeep(bytes calldata /* checkData */) external view override returns(bool upkeepNeeded, bytes memory performData) {
+        for(uint i=0; i < allBidders.length; i++){
+            if(bids[allBidders[i]] != 0){
+                for(uint j=1; j < allBidders.length; j++){
+                    if(bidders[j].highestBidder != allBidders[i]){
+                        upkeepNeeded = true;
+                        performData = abi.encodePacked(address(allBidders[i]));
+                    }
+                }
+            }
+        }
+        return (upkeepNeeded, performData);
+    }
+
+    function performUpkeep(bytes calldata performData) external override nonReentrant {
+        address refunder = abi.decode(performData, (address));
+
+        if(bids[refunder] != 0){
+            if(!isContract(refunder)){
+                (bool refund, ) = (refunder).call{value: bids[refunder]}("");
+                require(refund, "refund Failed");
+                emit BidRefunded(refunder, bids[refunder]);
+            } else {
+                (bool punished, ) = (owner()).call{value: bids[refunder]}("");
+                require(punished, "punishsing Failed");
+                emit RefunderPunished(owner(), bids[refunder]);
+            }
+        }
+
     }
 
     function changePlatformFee(uint256 _platformFee) external onlyOwner {
@@ -146,5 +184,13 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, /*AutomationCompatible,*/ 
 
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC2981, ERC721) returns (bool) {
         return super.supportsInterface(interfaceId);
+    }
+
+    function isContract(address account) internal view returns (bool) {
+        uint size;
+        assembly {
+            size := extcodesize(account)
+        }
+        return size > 0;
     }
 }
