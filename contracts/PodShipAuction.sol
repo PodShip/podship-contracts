@@ -4,9 +4,12 @@ pragma solidity 0.8.9;
 import "./PodShip.sol";
 import "./PodShipErrors.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
+import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 
-contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
+contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsumerBaseV2, AutomationCompatible {
     using Counters for Counters.Counter;
     Counters.Counter private auctionId;
     
@@ -41,13 +44,32 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
         address indexed bidder,
         uint256 bid
     );
+    event RequestedWinner(uint256 indexed requestId);
+    event RecentWinner(address indexed recentWinner);
     
     uint256 public platformFee;
     address public platformFeeRecipient;
+    uint256 private lastTimestamp;
+    // uint256 private constant interval = 7 * 86400; ///// For Mainnet
+    uint256 private constant interval = 5 * 60; ///// For Testnet/Testing
 
-    constructor(uint256 _platformFee, address _platformFeeRecipient) {
+    VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
+    bytes32 private immutable i_gasLane;
+    uint64 private immutable i_subscriptionId;
+    uint32 private immutable i_callbackGasLimit;
+    uint16 private constant REQUEST_CONFIRMATIONS = 3;
+    uint32 private constant NUM_WORDS = 1;
+
+    constructor(uint256 _platformFee, address _platformFeeRecipient, address _podshipNft, address vrfCoordinatorV2, bytes32 gasLane, uint64 subscriptionId, uint32 callbackGasLimit)
+    PodShip(_podshipNft)
+    VRFConsumerBaseV2(vrfCoordinatorV2) {
         platformFee = _platformFee;
         platformFeeRecipient = _platformFeeRecipient;
+        i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
+        i_gasLane = gasLane;
+        i_subscriptionId = subscriptionId;
+        i_callbackGasLimit = callbackGasLimit;
+        lastTimestamp = block.timestamp;
     }
 
     struct Auction {
@@ -80,6 +102,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
         uint256 auction_duration = _duration * 60;       ///// For testnet/testing
         _setTokenRoyalty(podcastId[_podcastId].tokenId, podcastId[_podcastId].nftCreator, _royaltyPercent);
         auctions[auctionId.current()] = Auction(_podcastId, _reservePrice * 10**18, 0, 0, auction_duration, _royaltyPercent, true);
+
         emit AuctionCreated(auctionId.current(), _reservePrice * 10**18, _royaltyPercent, _podcastId, auction_duration);
         return auctionId.current();
     }
@@ -99,6 +122,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
         }
         bidders[_auctionId].highestBidder = msg.sender;
         bidders[_auctionId].highestBid = msg.value;
+
         emit BidPlaced(_auctionId, msg.sender, msg.value);
     }
 
@@ -115,6 +139,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
         (bool success, ) = (podcastId[auctions[_auctionId].podcastId].nftOwner).call{value: NftOwnerCut}("");
         if(!success){ revert PodShipAuction__NftOwnerCutTransferFailed(); }
         podcastId[auctions[_auctionId].podcastId].nftOwner = bidders[_auctionId].highestBidder;
+
         emit AuctionResulted(_auctionId, bidders[_auctionId].highestBidder, bidders[_auctionId].highestBid);
         bidders[_auctionId].highestBid = 0;
         auctions[_auctionId].endTime = 0;
@@ -123,6 +148,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
     function cancelAuction(uint256 _auctionId) public {
         if(msg.sender != podcastId[auctions[_auctionId].podcastId].nftOwner && msg.sender != podcastId[auctions[_auctionId].podcastId].nftCreator){ revert PodShipAuction__OnlyAuctionCreatorAllowed(); }
         delete auctions[_auctionId];
+        
         emit AuctionCancelled(_auctionId);
     }
 
@@ -131,7 +157,42 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
         if(bids[msg.sender] == 0){ revert PodShipAuction__UserDidNotParticipatedInTheAuction(); }
         (bool sent, ) = payable(msg.sender).call{value: bids[msg.sender]}("");
         if(!sent){ revert PodShipAuction__WithdrawFailed(); }
+
         emit BidRefunded(_auctionId, msg.sender, bids[msg.sender]);
+    }
+
+    function checkUpkeep(bytes memory /*checkData*/) public view override returns(bool upkeepNeeded, bytes memory /*performData*/) {
+        bool timePassed = ((block.timestamp - lastTimestamp) > interval);
+        bool hasPlayers = (tippers.length > 0);
+        upkeepNeeded = (timePassed && hasPlayers);
+
+        return (upkeepNeeded, "");
+    }
+
+    function performUpkeep(bytes calldata /*performData*/) external override {
+        (bool upkeepNeeded, ) = checkUpkeep("");
+        if (!upkeepNeeded) {
+            revert UpkeepNotNeeded(tippers.length, block.timestamp);
+        }
+        uint256 requestId = i_vrfCoordinator.requestRandomWords(
+            i_gasLane, //keyHash
+            i_subscriptionId,
+            REQUEST_CONFIRMATIONS,
+            i_callbackGasLimit,
+            NUM_WORDS
+        );
+
+        emit RequestedWinner(requestId);
+    }
+
+    function fulfillRandomWords(uint256 /*requestId*/, uint256[] memory randomWords) internal override {
+        uint256 indexOfWinner = randomWords[0] % tippers.length;
+        address recentWinner = tippers[indexOfWinner];
+        mintPodShipSupporterNFT(recentWinner);
+        tippers = new address[](0);
+        lastTimestamp = block.timestamp;
+
+        emit RecentWinner(recentWinner);
     }
 
     function changePlatformFee(uint256 _platformFee) external onlyOwner {

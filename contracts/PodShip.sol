@@ -3,6 +3,7 @@ pragma solidity 0.8.9;
 
 import "./PodShipErrors.sol";
 import "./PriceConverter.sol";
+import "./PodShipSupporterNFT.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
@@ -13,6 +14,8 @@ contract PodShip is ERC721URIStorage, Ownable {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenId;
     Counters.Counter private _podcastId;
+
+    PodShipSupporterNFT public podshipNft;
 
     struct PodcastNFT {
         address nftCreator;
@@ -32,12 +35,18 @@ contract PodShip is ERC721URIStorage, Ownable {
         address indexed supporter
     );
 
+    address[] public tippers;
+    // uint256 public constant minimumTip = 1 * 10**18; ///// For Mainnet
+    uint256 public constant minimumTip = 1 * 10**17; ///// For Testnet/Testing
     mapping(uint256 => PodcastNFT) public podcastId;
 
-    uint256 public constant minimumTip = 1 * 10**18;
-
-    constructor() ERC721("PodShip Podcast NFT", "PODSHIP") {
+    constructor(address _podshipNft) ERC721("PodShip Podcast NFT", "PODSHIP") {
+        podshipNft = PodShipSupporterNFT(_podshipNft);
         emit PodShipContractDeployed();
+    }
+
+    function mintPodShipSupporterNFT(address _winner) public {
+        podshipNft.mintPodShipSupporterNFT(_winner);
     }
 
     function mintNFT(string memory ipfsURI) external returns(uint256) {
@@ -61,6 +70,7 @@ contract PodShip is ERC721URIStorage, Ownable {
         (bool sent, ) = (podcastId[_podcastID].nftCreator).call{value: msg.value}("");
         if(!sent){ revert PodShip__FailedToSendMATIC(); }
 
+        tippers.push(msg.sender);
         emit Tipping(_podcastID, msg.value, msg.sender);
     }
 

@@ -21,3 +21,4 @@ error PodShipAuction__AuctonWinnerCannotWithdraw();
 error PodShipAuction__UserDidNotParticipatedInTheAuction();
 error PodShipAuction__WithdrawFailed();
 error PodShipAuction__OnlyAuctionCreatorAllowed();
+error UpkeepNotNeeded(uint256 tippersLength, uint256 currentTime);
