@@ -2,14 +2,14 @@ const {ethers} = require("hardhat");
 
 async function main() {
   const PodShipContract = await ethers.getContractFactory("PodShipAuction");
-  const deployedPodShip = await PodShipContract.deploy(5, "0x66d126586d17e27A3E57A2C0301ebc0cCA2c45C7");
+  const deployedPodShip = await PodShipContract.deploy(5, "0x66d126586d17e27A3E57A2C0301ebc0cCA2c45C7", "0xb74BcaBBbE5BC2De2540F34B0BB2549f62893A8d", "0x7a1BaC17Ccc5b313516C5E16fb24f7659aA5ebed", "0x4b09e658ed251bcafeebbc69400383d49f344ace09b9576fe248bb02c003fe9f", "2368", "2500000");
   await deployedPodShip.deployed();
   console.log(`PodShip Contract Address: ${deployedPodShip.address}`);
 
   // if (network.config.chainId === 5 && process.env.ETHERSCAN_API_KEY) {
     console.log("Waiting for block confirmations & Verifying...")
     await deployedPodShip.deployTransaction.wait(5)
-    await verify(deployedPodShip.address, [5, "0x66d126586d17e27A3E57A2C0301ebc0cCA2c45C7"])
+    await verify(deployedPodShip.address, [5, "0x66d126586d17e27A3E57A2C0301ebc0cCA2c45C7", "0xb74BcaBBbE5BC2De2540F34B0BB2549f62893A8d", "0x7a1BaC17Ccc5b313516C5E16fb24f7659aA5ebed", "0x4b09e658ed251bcafeebbc69400383d49f344ace09b9576fe248bb02c003fe9f", "2368", "2500000"])
   // } else {
   //   console.log("Verification Falied");
   // }
