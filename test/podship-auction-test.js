@@ -65,13 +65,15 @@ describe("PodshipAuction", async function(){
     })
 
     it ("it should cancel an Auction successfully", async function(){
-        let auctionTxn = await PodShipContract.cancelAuction(2);
+        let auctionTxn = await PodShipContract.cancelAuction(0);
         await auctionTxn.wait(1)
+        let auctions = await PodShipContract.auctions[0]
+        assert.isFalse(auctions.listed)
         
     })
 
     it ("it should refund a bid successfully", async function(){
-        let auctionTxn = await PodShipContract.refundBid(2);
+        let auctionTxn = await PodShipContract.refundBid(0);
         await auctionTxn.wait(1)
         
     })
@@ -108,7 +110,7 @@ describe("PodshipAuction", async function(){
     })
 
     it ("it should Withdraw amount placed on Bid", async function(){
-        let auctionTxn = await PodShipContract.withdraw(5, 4, 7, 5);
+        let auctionTxn = await PodShipContract.withdraw();
         await auctionTxn.wait(1)
         
     })
