@@ -42,23 +42,25 @@ describe("PodshipAuction", async function(){
     })
 
     it ("it should place a Bid", async function(){
-        let targetReservedPrice = "4"
+        let targetReservedPrice = "0.1"
+        let targetBid = "0.2"
         let auctionTxn = await PodShipContract.startAuction(5, targetReservedPrice, 7, 5);
         await auctionTxn.wait(1)
         
         let BidauctionTxn = await PodShipContract.bid(0);
         await BidauctionTxn.wait(1)
-        
+
         let auctions = await PodShipContract.auctions[0]
         assert.equal(auctions.reservedPrice, targetReservedPrice)
         await auctionTxn.wait(1)
-
         
     })
 
     it ("it should end an Auction successfully", async function(){
-        let auctionTxn = await PodShipContract.endAuction(2);
+        let auctionTxn = await PodShipContract.endAuction(0);
         await auctionTxn.wait(1)
+        let auctions = await PodShipContract.auctions[0]
+        assert.isFalse(auctions.listed)
         
     })
 
