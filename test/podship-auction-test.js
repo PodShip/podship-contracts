@@ -2,7 +2,7 @@ const { assert } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("PodshipAuction", async function () {
-    let PodShipContract, deployedPodShip, PodShipNFTContract, deployedPodShipNFT;
+    let PodShipContractFactory, deployedPodShip, PodShipNFTContractFactory, deployedPodShipNFT;
     beforeEach(async function () {
         // Auction smart contract deployment
         PodShipContractFactory = await ethers.getContractFactory("PodShipAuction");
@@ -10,17 +10,19 @@ describe("PodshipAuction", async function () {
         await deployedPodShip.deployed();
 
         // NFT smart contract deployment
-        PodShipNFTContractFactory = await ethers.getContractFactory("PodShipSupporterNFT");
-        deployedPodShipNFT = await PodShipNFTContractFactory.deploy();
+        PodShipNFTContractFactory = await ethers.getContractFactory("PodShip");
+        deployedPodShipNFT = await PodShipNFTContractFactory.deploy("0x66d126586d17e27A3E57A2C0301ebc0cCA2c45C7");
         await deployedPodShipNFT.deployed();
         console.log(`PodShipNFT Contract Address: ${deployedPodShipNFT.address}`);
+
+      
     })
 
     it("it should mint a supporters NFT successfully to owners address", async function () {
-        let targetOwnerAddress = "0x10A6926348861E90BFB466C6CEe4205befcd30C3"
-        let nftTransaction = await deployedPodShipNFT.mintPodShipSupporterNFT(targetOwnerAddress, 5, 1, "")
+        let targetOwnerAddress = "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
+        let nftTransaction = await deployedPodShipNFT.mintNFT(targetOwnerAddress)
         await nftTransaction.wait(1)
-        let currentTargetOwnerAddress = await deployedPodShipNFT.getNftOwner(5)
+        let currentTargetOwnerAddress = await deployedPodShipNFT.getNftOwner(1)
         assert.equal(currentTargetOwnerAddress, targetOwnerAddress)
 
     })
@@ -33,26 +35,29 @@ describe("PodshipAuction", async function () {
 
     it("it should start an Auction successfully", async function () {
         let targetReservedPrice = "4"
-        let auctionTxn = await deployedPodShip.startAuction(5, targetReservedPrice, 7, 5);
+        let auctionTxn = await deployedPodShip.startAuction(1, targetReservedPrice, 7, 5);
         await auctionTxn.wait(1)
 
-        let auctions = await deployedPodShip.auctions[0]
+        let auctions = await deployedPodShip.auctions[1]
         assert.equal(auctions.reservedPrice, targetReservedPrice)
 
     })
 
     it("it should place a Bid", async function () {
-        let targetReservedPrice = "0.1"
-        let targetBid = "0.2"
-        let auctionTxn = await deployedPodShip.startAuction(5, targetReservedPrice, 7, 5);
+        let targetReservedPrice = "1"
+        let targetBid = "2"
+        let targetOwnerAddress = "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
+        let nftTransaction = await deployedPodShipNFT.mintPodShipSupporterNFT(targetOwnerAddress)
+        await nftTransaction.wait(1)
+        let auctionTxn = await deployedPodShip.startAuction(1, targetReservedPrice, 7, 5);
         await auctionTxn.wait(1)
 
-        let BidauctionTxn = await deployedPodShip.bid(0);
+        let BidauctionTxn = await deployedPodShip.bid(1);
         await BidauctionTxn.wait(1)
-
+        
         let auctions = await deployedPodShip.auctions[0]
         assert.equal(auctions.reservedPrice, targetReservedPrice)
-        await auctionTxn.wait(1)
+    
 
     })
 
@@ -98,14 +103,21 @@ describe("PodshipAuction", async function () {
     })
 
     it("it should change platform fee recipient", async function () {
-        let auctionTxn = await deployedPodShip.changePlatformFee(5);
+        let targetPlatformFee = "5"
+        let auctionTxn = await deployedPodShip.changePlatformFee(targetPlatformFee);
         await auctionTxn.wait(1)
+        let currentPlatformFee = await deployedPodShip.platformFee()
+        assert.equal(currentPlatformFee == targetPlatformFee)
 
     })
 
     it("it should change platform fee", async function () {
-        let auctionTxn = await deployedPodShip.changePlatformFeeRecipient("0x10A6926348861E90BFB466C6CEe4205befcd30C3");
+        let targetPlatformFeeRecipient = "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
+        let auctionTxn = await deployedPodShip.changePlatformFeeRecipient(targetPlatformFeeRecipient);
         await auctionTxn.wait(1)
+
+        let currentPlatformFeeRecipient = await deployedPodShip.platformFeeRecipient()
+        assert.equal(currentPlatformFeeRecipient == targetPlatformFeeRecipient)
 
     })
 
