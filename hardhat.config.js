@@ -1,5 +1,6 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("dotenv").config({ path: ".env" });
+require("hardhat-gas-reporter")
 
 POLYGON_TESTNET_URL = process.env.POLYGON_TESTNET_URL;
 PRIVATE_KEY = process.env.PRIVATE_KEY;
@@ -25,5 +26,12 @@ module.exports = {
   },
   etherscan: {
     apiKey: ETHERSCAN_API_KEY
+  },
+  gasReporter: {
+    enabled: true,
+    outputFIle: "gas-report.txt",
+    noColors: true,
+    currency: "USD",
+    coinmarketcap: process.env.COINMARKETCAP
   }
 };
