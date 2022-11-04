@@ -157,7 +157,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
         if(bids[msg.sender] == 0){ revert PodShipAuction__UserDidNotParticipatedInTheAuction(); }
         (bool sent, ) = payable(msg.sender).call{value: bids[msg.sender]}("");
         if(!sent){ revert PodShipAuction__WithdrawFailed(); }
-        bids[msg.sender] == 0;
+        bids[msg.sender] = 0;
         emit BidRefunded(_auctionId, msg.sender, bids[msg.sender]);
     }
 
