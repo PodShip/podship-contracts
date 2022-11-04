@@ -152,7 +152,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
         emit AuctionCancelled(_auctionId);
     }
 
-    function refundBid(uint256 _auctionId) public payable {
+    function refundBid(uint256 _auctionId) public payable nonReentrant {
         if(msg.sender == bidders[_auctionId].highestBidder){ revert PodShipAuction__AuctonWinnerCannotWithdraw();}
         if(bids[msg.sender] == 0){ revert PodShipAuction__UserDidNotParticipatedInTheAuction(); }
         (bool sent, ) = payable(msg.sender).call{value: bids[msg.sender]}("");
@@ -185,7 +185,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
         emit RequestedWinner(requestId);
     }
 
-    function fulfillRandomWords(uint256 /*requestId*/, uint256[] memory randomWords) internal override {
+    function fulfillRandomWords(uint256 /*requestId*/, uint256[] memory randomWords) internal override nonReentrant {
         uint256 indexOfWinner = randomWords[0] % tippers.length;
         address recentWinner = tippers[indexOfWinner];
         mintPodShipSupporterNFT(recentWinner);
