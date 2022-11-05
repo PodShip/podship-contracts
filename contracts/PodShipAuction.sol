@@ -47,8 +47,8 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
     event RequestedWinner(uint256 indexed requestId);
     event RecentWinner(address indexed recentWinner);
     
-    uint256 public platformFee;
-    address public platformFeeRecipient;
+    uint256 private platformFee;
+    address private platformFeeRecipient;
     uint256 private lastTimestamp;
     // uint256 private constant INTERVAL = 7 * 86400; ///// For Mainnet
     uint256 private constant INTERVAL = 5 * 60; ///// For Testnet/Testing
@@ -134,9 +134,9 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
         safeTransferFrom(podcastId[auctions[_auctionId].podcastId].nftOwner, bidders[_auctionId].highestBidder, podcastId[auctions[_auctionId].podcastId].tokenId);
         uint256 platformCut = (platformFee * bidders[_auctionId].highestBid)/100;
         uint256 NftOwnerCut = bidders[_auctionId].highestBid - platformCut;
-        (bool pass, ) = platformFeeRecipient.call{value: platformCut}("");
+        (bool pass, ) = payable(platformFeeRecipient).call{value: platformCut}("");
         if(!pass){ revert PodShipAuction__platformFeeTransferFailed(); }
-        (bool success, ) = (podcastId[auctions[_auctionId].podcastId].nftOwner).call{value: NftOwnerCut}("");
+        (bool success, ) = payable(podcastId[auctions[_auctionId].podcastId].nftOwner).call{value: NftOwnerCut}("");
         if(!success){ revert PodShipAuction__NftOwnerCutTransferFailed(); }
         podcastId[auctions[_auctionId].podcastId].nftOwner = bidders[_auctionId].highestBidder;
 
@@ -152,7 +152,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
         emit AuctionCancelled(_auctionId);
     }
 
-    function refundBid(uint256 _auctionId) public payable nonReentrant {
+    function refundBid(uint256 _auctionId) public nonReentrant {
         if(msg.sender == bidders[_auctionId].highestBidder){ revert PodShipAuction__AuctonWinnerCannotWithdraw();}
         if(bids[msg.sender] == 0){ revert PodShipAuction__UserDidNotParticipatedInTheAuction(); }
         (bool sent, ) = payable(msg.sender).call{value: bids[msg.sender]}("");
@@ -195,6 +195,11 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
         emit RecentWinner(recentWinner);
     }
 
+    function withdraw() external onlyOwner {
+        (bool withdrawn, ) = payable(owner()).call{value: address(this).balance}("");
+        if(!withdrawn){revert PodShipAuction__WithdrawFailed(); }
+    }
+
     function changePlatformFee(uint256 _platformFee) external onlyOwner {
         platformFee = _platformFee;
         emit PlatformFeeChanged(_platformFee);
@@ -205,9 +210,17 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
         emit PlatformFeeRecipientChanged(_platformFeeRecipient);
     }
 
-    function withdraw() external onlyOwner payable {
-        (bool withdrawn, ) = payable(owner()).call{value: address(this).balance}("");
-        if(!withdrawn){revert PodShipAuction__WithdrawFailed(); }
+    function getPlatformFee() public view returns(uint256) {
+        return platformFee;
+    }
+    function getLastTimestamp() public view returns(uint256) {
+        return lastTimestamp;
+    }
+    function getPlatformFeeRecipient() public view returns(address) {
+        return platformFeeRecipient;
+    }
+    function getInterval() public pure returns(uint256) {
+        return INTERVAL;
     }
 
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC2981, ERC721) returns (bool) {
