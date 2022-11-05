@@ -22,3 +22,6 @@ error PodShipAuction__UserDidNotParticipatedInTheAuction();
 error PodShipAuction__WithdrawFailed();
 error PodShipAuction__OnlyAuctionCreatorAllowed();
 error UpkeepNotNeeded(uint256 tippersLength, uint256 currentTime);
+
+// PodShipSupporterNFT.sol
+error PodShip__ZeroAddress();

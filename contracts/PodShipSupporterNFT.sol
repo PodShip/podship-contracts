@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.9;
 
+import "./PodShipErrors.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 
@@ -11,6 +12,7 @@ contract PodShipSupporterNFT is ERC1155Supply {
     constructor() ERC1155("ipfs://QmYtVxCDyt7Mr12JDAgjhYS3wqq954n1sps8cjaJuW7RfL/") {}
 
     function mintPodShipSupporterNFT(address _winner) public {
+        if(_winner == address(0)) { revert PodShip__ZeroAddress(); }
         _mint(_winner, PodShipSupporterNft, 1, "");
     }
 

@@ -50,8 +50,8 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
     uint256 public platformFee;
     address public platformFeeRecipient;
     uint256 private lastTimestamp;
-    // uint256 private constant interval = 7 * 86400; ///// For Mainnet
-    uint256 private constant interval = 5 * 60; ///// For Testnet/Testing
+    // uint256 private constant INTERVAL = 7 * 86400; ///// For Mainnet
+    uint256 private constant INTERVAL = 5 * 60; ///// For Testnet/Testing
 
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     bytes32 private immutable i_gasLane;
@@ -162,7 +162,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
     }
 
     function checkUpkeep(bytes memory /*checkData*/) public view override returns(bool upkeepNeeded, bytes memory /*performData*/) {
-        bool timePassed = ((block.timestamp - lastTimestamp) > interval);
+        bool timePassed = ((block.timestamp - lastTimestamp) > INTERVAL);
         bool hasPlayers = (tippers.length > 0);
         upkeepNeeded = (timePassed && hasPlayers);
 
