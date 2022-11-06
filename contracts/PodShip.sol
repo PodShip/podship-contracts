@@ -14,7 +14,6 @@ contract PodShip is ERC721URIStorage, Ownable {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenId;
     Counters.Counter private _podcastId;
-
     PodShipSupporterNFT public podshipNft;
 
     struct PodcastNFT {

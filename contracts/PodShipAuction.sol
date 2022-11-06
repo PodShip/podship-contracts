@@ -8,6 +8,7 @@ import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
+import "hardhat/console.sol";
 
 contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsumerBaseV2, AutomationCompatible {
     using Counters for Counters.Counter;
