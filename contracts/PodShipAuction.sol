@@ -3,12 +3,14 @@ pragma solidity 0.8.9;
 
 import "./PodShip.sol";
 import "./PodShipErrors.sol";
+import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 
+///// @notice PodShip's Auctions core contract
 contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsumerBaseV2, AutomationCompatible {
     using Counters for Counters.Counter;
     Counters.Counter private auctionId;
@@ -50,8 +52,8 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
     uint256 private platformFee;
     address private platformFeeRecipient;
     uint256 private lastTimestamp;
-    // uint256 private constant INTERVAL = 7 * 86400; ///// For Mainnet
-    uint256 private constant INTERVAL = 5 * 60; ///// For Testnet/Testing
+    // uint256 private constant INTERVAL = 7 * 86400;   ///// For Mainnet
+    uint256 private constant INTERVAL = 5 * 60;         ///// For Testnet
 
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     bytes32 private immutable i_gasLane;
@@ -91,6 +93,10 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
     mapping(uint256 => Bidding) public bidders;
     mapping(address => uint) public bids;
 
+    /// @dev Only NFT Owner can start the auction, Auction Duration days can be 1 to 7 days long, Royalty Percent can on be between 1 & 50 and reserve prive should be more than 1 MATIC.
+    /// @param _reservePrice - Auction starting price for the NFT
+    /// @param _duration - Duration of the Auction in days
+    /// @param _royaltyPercent - Royalty Percentage NFT creator will get on the resales
     function startAuction(uint256 _podcastId, uint256 _reservePrice, uint256 _duration, uint96 _royaltyPercent) public returns(uint256) {
         if(msg.sender != ownerOf(_podcastId)){ revert PodShipAuction__OnlyNftOwnerCanStartTheAuction(); }
         if(_duration < 1 && _duration > 7){ revert PodShipAuction__AuctionDuration_1to7_DaysAllowed(); }
@@ -98,8 +104,8 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
         if(_reservePrice < 1){ revert PodShipAuction__ReservePriceZeroNotAllowed(); }
         auctionId.increment();
         approve(address(this), podcastId[_podcastId].tokenId);
-        // uint256 auction_duration = _duration * 86400; ///// For Mainnet
-        uint256 auction_duration = _duration * 60;       ///// For testnet/testing
+        // uint256 auction_duration = _duration * 86400;   ///// For Mainnet
+        uint256 auction_duration = _duration * 60;         ///// For testnet/testing
         _setTokenRoyalty(podcastId[_podcastId].tokenId, podcastId[_podcastId].nftCreator, _royaltyPercent);
         auctions[auctionId.current()] = Auction(_podcastId, _reservePrice * 10**18, 0, 0, auction_duration, _royaltyPercent, true);
 
@@ -175,7 +181,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
             revert UpkeepNotNeeded(tippers.length, block.timestamp);
         }
         uint256 requestId = i_vrfCoordinator.requestRandomWords(
-            i_gasLane, //keyHash
+            i_gasLane,
             i_subscriptionId,
             REQUEST_CONFIRMATIONS,
             i_callbackGasLimit,

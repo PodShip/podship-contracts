@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.9;
 
+import "hardhat/console.sol";
 import "./PodShipErrors.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 
+///// @notice PodShip Supporter NFT contract
 contract PodShipSupporterNFT is ERC1155Supply {
 
     uint8 public constant PodShipSupporterNft = 5;

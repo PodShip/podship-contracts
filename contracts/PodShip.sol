@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.9;
 
+import "hardhat/console.sol";
 import "./PodShipErrors.sol";
 import "./PriceConverter.sol";
 import "./PodShipSupporterNFT.sol";
@@ -8,6 +9,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 
+///// @title PodShip Podcast NFT
+///// @author Team PodShip <podshipplatform@gmail.com>
+///// @notice PodShip's main contract
 contract PodShip is ERC721URIStorage, Ownable {
     using PriceConverter for uint256;
 
@@ -36,10 +40,10 @@ contract PodShip is ERC721URIStorage, Ownable {
     );
 
     address[] public tippers;
-    // uint256 public constant minimumTip = 1 * 10**18; ///// For Mainnet
-    uint256 public constant minimumTip = 1 * 10**17; ///// For Testnet/Testing
+    uint256 public constant minimumTip = 1 * 10**18;
     mapping(uint256 => PodcastNFT) public podcastId;
 
+    /// @param _podshipNft - PodShipSupporterNFT contract Address
     constructor(address _podshipNft) ERC721("PodShip Podcast NFT", "PODSHIP") {
         podshipNft = PodShipSupporterNFT(_podshipNft);
         emit PodShipContractDeployed();
