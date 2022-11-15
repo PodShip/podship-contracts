@@ -91,7 +91,9 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
 
     mapping(uint256 => Auction) public auctions;
     mapping(uint256 => Bidding) public bidders;
-    mapping(address => uint) public bids;
+
+    /// @dev mapinng msgSender -> msgValue -> auctionId
+    mapping(address => mapping(uint => uint)) public bids;
 
     /// @dev Only NFT Owner can start the auction, Auction Duration days can be 1 to 7 days long, Royalty Percent can on be between 1 & 50 and reserve prive should be more than 1 MATIC.
     /// @param _reservePrice - Auction starting price for the NFT
@@ -99,8 +101,10 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
     /// @param _royaltyPercent - Royalty Percentage NFT creator will get on the resales
     function startAuction(uint256 _podcastId, uint256 _reservePrice, uint256 _duration, uint96 _royaltyPercent) public returns(uint256) {
         if(msg.sender != ownerOf(_podcastId)){ revert PodShipAuction__OnlyNftOwnerCanStartTheAuction(); }
-        if(_duration < 1 && _duration > 7){ revert PodShipAuction__AuctionDuration_1to7_DaysAllowed(); }
-        if(_royaltyPercent < 1 && _royaltyPercent > 50){ revert PodShipAuction__NftRoyalties_1to50_PercentAllowed(); }
+        if(_duration < 1){ revert PodShipAuction__AuctionDuration_1to7_DaysAllowed(); }
+        if(_duration > 7){ revert PodShipAuction__AuctionDuration_1to7_DaysAllowed(); }
+        if(_royaltyPercent < 1){ revert PodShipAuction__NftRoyalties_1to50_PercentAllowed(); }
+        if(_royaltyPercent > 50){ revert PodShipAuction__NftRoyalties_1to50_PercentAllowed(); }
         if(_reservePrice < 1){ revert PodShipAuction__ReservePriceZeroNotAllowed(); }
         auctionId.increment();
         approve(address(this), podcastId[_podcastId].tokenId);
@@ -114,17 +118,22 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
     }
 
     function bid(uint256 _auctionId) public payable {
+        if(msg.sender == podcastId[auctions[_auctionId].podcastId].nftOwner){ revert PodShipAuction__NftOwnerCannotBid(); }
         if(!auctions[_auctionId].listed){ revert PodShipAuction__NftNotOnAuction(); }
         if(bidders[_auctionId].highestBidder == address(0)) {
             auctions[_auctionId].startTime = block.timestamp;
         }
         auctions[_auctionId].endTime = auctions[_auctionId].startTime + auctions[_auctionId].duration;
         if(block.timestamp > auctions[_auctionId].endTime){ revert PodShipAuction__AuctionEnded(); }
-        if(msg.value < auctions[_auctionId].reservePrice && msg.value < bidders[_auctionId].highestBid){
-            revert PodShipAuction__InputAmountBelowNftReservePriceOrLastHighestBid();
+        if(msg.value == 0) { revert PodShipAuction__InputAmountCannotBeZero(); }
+        if(msg.value < auctions[_auctionId].reservePrice){
+            revert PodShipAuction__InputAmountBelowNftReservePrice();
+        }
+        if(msg.value <= bidders[_auctionId].highestBid){
+            revert PodShipAuction__InputAmountBelowNftLastHighestBid();
         }
         if (msg.sender != address(0)) {
-            bids[msg.sender] += msg.value;
+            bids[msg.sender][_auctionId] += msg.value;
         }
         bidders[_auctionId].highestBidder = msg.sender;
         bidders[_auctionId].highestBid = msg.value;
@@ -152,7 +161,8 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
     }
 
     function cancelAuction(uint256 _auctionId) public {
-        if(msg.sender != podcastId[auctions[_auctionId].podcastId].nftOwner && msg.sender != podcastId[auctions[_auctionId].podcastId].nftCreator){ revert PodShipAuction__OnlyAuctionCreatorAllowed(); }
+        if(msg.sender != podcastId[auctions[_auctionId].podcastId].nftOwner){ revert PodShipAuction__OnlyAuctionCreatorAllowed(); }
+        if(msg.sender != podcastId[auctions[_auctionId].podcastId].nftCreator){ revert PodShipAuction__OnlyAuctionCreatorAllowed(); }
         delete auctions[_auctionId];
         
         emit AuctionCancelled(_auctionId);
@@ -160,11 +170,11 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
 
     function refundBid(uint256 _auctionId) public nonReentrant {
         if(msg.sender == bidders[_auctionId].highestBidder){ revert PodShipAuction__AuctonWinnerCannotWithdraw();}
-        if(bids[msg.sender] == 0){ revert PodShipAuction__UserDidNotParticipatedInTheAuction(); }
-        (bool sent, ) = payable(msg.sender).call{value: bids[msg.sender]}("");
+        if(bids[msg.sender][_auctionId] == 0){ revert PodShipAuction__UserDidNotParticipatedInTheAuction(); }
+        (bool sent, ) = payable(msg.sender).call{value: bids[msg.sender][_auctionId]}("");
         if(!sent){ revert PodShipAuction__WithdrawFailed(); }
-        bids[msg.sender] = 0;
-        emit BidRefunded(_auctionId, msg.sender, bids[msg.sender]);
+        bids[msg.sender][_auctionId] = 0;
+        emit BidRefunded(_auctionId, msg.sender, bids[msg.sender][_auctionId]);
     }
 
     function checkUpkeep(bytes memory /*checkData*/) public view override returns(bool upkeepNeeded, bytes memory /*performData*/) {

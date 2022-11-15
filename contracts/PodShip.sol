@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 
 ///// @title PodShip Podcast NFT
-///// @author Team PodShip <podshipplatform@gmail.com>
+///// @author ABDul Rehman <devabdee@gmail.com>
 ///// @notice PodShip's main contract
 contract PodShip is ERC721URIStorage, Ownable {
     using PriceConverter for uint256;
