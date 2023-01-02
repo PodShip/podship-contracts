@@ -5,13 +5,10 @@ import "./PodShip.sol";
 import "./PodShipErrors.sol";
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
-import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 
 ///// @notice PodShip's Auctions core contract
-contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsumerBaseV2, AutomationCompatible {
+contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
     using Counters for Counters.Counter;
     Counters.Counter private auctionId;
     
@@ -51,27 +48,10 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
     
     uint256 private platformFee;
     address private platformFeeRecipient;
-    uint256 private lastTimestamp;
-    // uint256 private constant INTERVAL = 7 * 86400;   ///// For Mainnet
-    uint256 private constant INTERVAL = 5 * 60;         ///// For Testnet
 
-    VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
-    bytes32 private immutable i_gasLane;
-    uint64 private immutable i_subscriptionId;
-    uint32 private immutable i_callbackGasLimit;
-    uint16 private constant REQUEST_CONFIRMATIONS = 3;
-    uint32 private constant NUM_WORDS = 1;
-
-    constructor(uint256 _platformFee, address _platformFeeRecipient, address _podshipNft, address vrfCoordinatorV2, bytes32 gasLane, uint64 subscriptionId, uint32 callbackGasLimit)
-    PodShip(_podshipNft)
-    VRFConsumerBaseV2(vrfCoordinatorV2) {
+    constructor(uint256 _platformFee, address _platformFeeRecipient){
         platformFee = _platformFee;
         platformFeeRecipient = _platformFeeRecipient;
-        i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
-        i_gasLane = gasLane;
-        i_subscriptionId = subscriptionId;
-        i_callbackGasLimit = callbackGasLimit;
-        lastTimestamp = block.timestamp;
     }
 
     struct Auction {
@@ -177,40 +157,6 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
         emit BidRefunded(_auctionId, msg.sender, bids[msg.sender][_auctionId]);
     }
 
-    function checkUpkeep(bytes memory /*checkData*/) public view override returns(bool upkeepNeeded, bytes memory /*performData*/) {
-        bool timePassed = ((block.timestamp - lastTimestamp) > INTERVAL);
-        bool hasPlayers = (tippers.length > 0);
-        upkeepNeeded = (timePassed && hasPlayers);
-
-        return (upkeepNeeded, "");
-    }
-
-    function performUpkeep(bytes calldata /*performData*/) external override {
-        (bool upkeepNeeded, ) = checkUpkeep("");
-        if (!upkeepNeeded) {
-            revert UpkeepNotNeeded(tippers.length, block.timestamp);
-        }
-        uint256 requestId = i_vrfCoordinator.requestRandomWords(
-            i_gasLane,
-            i_subscriptionId,
-            REQUEST_CONFIRMATIONS,
-            i_callbackGasLimit,
-            NUM_WORDS
-        );
-
-        emit RequestedWinner(requestId);
-    }
-
-    function fulfillRandomWords(uint256 /*requestId*/, uint256[] memory randomWords) internal override nonReentrant {
-        uint256 indexOfWinner = randomWords[0] % tippers.length;
-        address recentWinner = tippers[indexOfWinner];
-        mintPodShipSupporterNFT(recentWinner);
-        tippers = new address[](0);
-        lastTimestamp = block.timestamp;
-
-        emit RecentWinner(recentWinner);
-    }
-
     function withdraw() external onlyOwner {
         (bool withdrawn, ) = payable(owner()).call{value: address(this).balance}("");
         if(!withdrawn){revert PodShipAuction__WithdrawFailed(); }
@@ -229,14 +175,8 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard, VRFConsum
     function getPlatformFee() public view returns(uint256) {
         return platformFee;
     }
-    function getLastTimestamp() public view returns(uint256) {
-        return lastTimestamp;
-    }
     function getPlatformFeeRecipient() public view returns(address) {
         return platformFeeRecipient;
-    }
-    function getInterval() public pure returns(uint256) {
-        return INTERVAL;
     }
 
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC2981, ERC721) returns (bool) {

@@ -2,7 +2,8 @@
 pragma solidity 0.8.9;
 
 // PodShip.sol:
-error PodShip__TippingLessThanOneUsdNotAllowed();
+error PodShip__ZeroAddress();
+error PodShip__TippingLessThanOneMaticNotAllowed();
 error PodShip__FailedToSendMATIC();
 
 // PodShipAuction.sol:
@@ -25,8 +26,3 @@ error PodShipAuction__UserDidNotParticipatedInTheAuction();
 error PodShipAuction__WithdrawFailed();
 error PodShipAuction__OnlyAuctionCreatorAllowed();
 error UpkeepNotNeeded(uint256 tippersLength, uint256 currentTime);
-
-// PodShipSupporterNFT.sol
-error PodShip__ZeroAddress();
-
-

@@ -1,14 +1,18 @@
 const {ethers} = require("hardhat");
 
 async function main() {
-  const PodShipNFTContract = await ethers.getContractFactory("PodShipSupporterNFT");
-  const deployedPodShipNFT = await PodShipNFTContract.deploy();
-  await deployedPodShipNFT.deployed();
-  console.log(`PodShipNFT Contract Address: ${deployedPodShipNFT.address}`);
+  const PodShipContract = await ethers.getContractFactory("PodShipAuction");
+  const deployedPodShip = await PodShipContract.deploy(5, "0x66d126586d17e27A3E57A2C0301ebc0cCA2c45C7");
+  await deployedPodShip.deployed();
+  console.log(`PodShip Contract Address: ${deployedPodShip.address}`);
 
+  // if (network.config.chainId === 5 && process.env.ETHERSCAN_API_KEY) {
     console.log("Waiting for block confirmations & Verifying...")
-    await deployedPodShipNFT.deployTransaction.wait(5)
-    await verify(deployedPodShipNFT.address, [])
+    await deployedPodShip.deployTransaction.wait(5)
+    await verify(deployedPodShip.address, [5, "0x66d126586d17e27A3E57A2C0301ebc0cCA2c45C7"])
+  // } else {
+  //   console.log("Verification Falied");
+  // }
 }
 
 const verify = async (contractAddress, args) => {

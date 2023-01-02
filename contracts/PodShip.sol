@@ -3,8 +3,6 @@ pragma solidity 0.8.9;
 
 import "hardhat/console.sol";
 import "./PodShipErrors.sol";
-import "./PriceConverter.sol";
-import "./PodShipSupporterNFT.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
@@ -13,13 +11,9 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 ///// @author ABDul Rehman <devabdee@gmail.com>
 ///// @notice PodShip's main contract
 contract PodShip is ERC721URIStorage, Ownable {
-    using PriceConverter for uint256;
-
     using Counters for Counters.Counter;
     Counters.Counter private _tokenId;
     Counters.Counter private _podcastId;
-
-    PodShipSupporterNFT public podshipNft;
 
     struct PodcastNFT {
         address nftCreator;
@@ -39,19 +33,13 @@ contract PodShip is ERC721URIStorage, Ownable {
         address indexed supporter
     );
 
-    address[] public tippers;
-    uint256 public constant minimumTip = 1 * 10**18;
+    uint256 public constant MINIMUM_TIP = 1 * 10**18;
     mapping(uint256 => PodcastNFT) public podcastId;
 
-    /// @param _podshipNft - PodShipSupporterNFT contract Address
-    constructor(address _podshipNft) ERC721("PodShip Podcast NFT", "PODSHIP") {
-        podshipNft = PodShipSupporterNFT(_podshipNft);
+    constructor() ERC721("PodShip Podcast NFT", "PODSHIP") {
         emit PodShipContractDeployed();
     }
 
-    function mintPodShipSupporterNFT(address _winner) public {
-        podshipNft.mintPodShipSupporterNFT(_winner);
-    }
 
     function mintNFT(string memory ipfsURI) external returns(uint256) {
         _tokenId.increment();
@@ -70,11 +58,10 @@ contract PodShip is ERC721URIStorage, Ownable {
     } 
 
     function tipCreator(uint256 _podcastID) external payable {
-        if(msg.value.getConversionRate() < minimumTip){ revert PodShip__TippingLessThanOneUsdNotAllowed(); }
+        if(msg.value <= MINIMUM_TIP){ revert PodShip__TippingLessThanOneMaticNotAllowed(); }
         (bool sent, ) = (podcastId[_podcastID].nftCreator).call{value: msg.value}("");
         if(!sent){ revert PodShip__FailedToSendMATIC(); }
 
-        tippers.push(msg.sender);
         emit Tipping(_podcastID, msg.value, msg.sender);
     }
 
