@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@chainlink/contracts": "^0.5.1",
+    "@glif/filecoin-address": "^2.0.20",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
     "@nomicfoundation/hardhat-toolbox": "^2.0.0",
     "@nomiclabs/hardhat-ethers": "^2.1.1",
@@ -23,6 +24,10 @@
     "chai": "^4.3.6",
     "dotenv": "^16.0.3",
     "ethers": "^5.7.1",
-    "hardhat": "^2.11.2"
+    "hardhat": "^2.11.2",
+    "hardhat-deploy": "^0.11.22",
+    "hardhat-deploy-ethers": "^0.3.0-beta.13",
+    "request": "^2.88.2",
+    "util": "^0.12.5"
   }
 }
