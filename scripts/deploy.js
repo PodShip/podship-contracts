@@ -6,13 +6,13 @@ async function main() {
   await deployedPodShip.deployed();
   console.log(`PodShip Contract Address: ${deployedPodShip.address}`);
 
-  console.log("Waiting for block confirmations & Verifying...")
+  console.log("Waiting for block confirmations & Verifying.....")
   await deployedPodShip.deployTransaction.wait(5)
   await verify(deployedPodShip.address, [5, "0x66d126586d17e27A3E57A2C0301ebc0cCA2c45C7"])
 }
 
 const verify = async (contractAddress, args) => {
-  console.log("Verifying contract...")
+  console.log("Verifying contract.....")
   try {
     await run("verify:verify", {
       address: contractAddress,
