@@ -1,51 +1,20 @@
-require("hardhat-deploy")
-require("hardhat-deploy-ethers")
-
-const ethers = require("ethers")
-const fa = require("@glif/filecoin-address")
-const util = require("util")
-const request = util.promisify(require("request"))
+const {ethers} = require("hardhat");
+require("dotenv").config({ path: ".env" });
 
 PRIVATE_KEY = process.env.PRIVATE_KEY;
+const wallet = new ethers.Wallet(PRIVATE_KEY, ethers.provider)
 
-async function callRpc(method, params) {
-    var options = {
-        method: "POST",
-        url: "https://api.zondax.ch/fil/node/hyperspace/rpc/v0",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            jsonrpc: "2.0",
-            method: method,
-            params: params,
-            id: 1,
-        }),
-    }
-    const res = await request(options)
-    return JSON.parse(res.body).result
-}
-
-const deployer = new ethers.Wallet(PRIVATE_KEY)
-
-module.exports = async ({ deployments }) => {
-    const { deploy } = deployments
-
-    const priorityFee = await callRpc("eth_maxPriorityFeePerGas")
-    const f4Address = fa.newDelegatedEthAddress(deployer.address).toString()
-    const nonce = await callRpc("Filecoin.MpoolGetNonce", [f4Address])
-
-    console.log("Wallet Ethereum Address:", deployer.address)
-    console.log("Wallet f4Address: ", f4Address)
-
-    const deployedPodShip = await deploy("contracts/PodShipAuction.sol:PodShipAuction", {
-        from: deployer.address,
-        args: [],
-        maxPriorityFeePerGas: priorityFee,
-        log: true,
-    })
+async function main() {
+    console.log("Wallet Ethereum Address:", wallet.address)
+    const PodShipContract = await ethers.getContractFactory("PodShipAuction", wallet);
+    const deployedPodShip = await PodShipContract.deploy(5, "0x66d126586d17e27A3E57A2C0301ebc0cCA2c45C7");
     await deployedPodShip.deployed();
     console.log(`PodShip Contract Address: ${deployedPodShip.address}`);
 }
 
-module.exports.tags = ["PodShipAuction"]
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+});

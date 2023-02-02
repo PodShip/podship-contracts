@@ -46,12 +46,13 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
     event RequestedWinner(uint256 indexed requestId);
     event RecentWinner(address indexed recentWinner);
     
-    /// @dev hardcoding for smooth FVM testnet Deployment
-    /// TODO: Set platformFee & platformFeeRecipient in the constructor while mainnet deployment
-    uint256 private platformFee = 5;
-    address private platformFeeRecipient = 0x66d126586d17e27A3E57A2C0301ebc0cCA2c45C7;
+    uint256 private platformFee;
+    address private platformFeeRecipient;
 
-    constructor(){}
+    constructor(uint256 _platformFee, address _platformFeeRecipient){
+        platformFee = _platformFee;
+        platformFeeRecipient = _platformFeeRecipient;
+    }
 
     struct Auction {
         uint256 podcastId;
