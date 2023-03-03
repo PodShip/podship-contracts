@@ -3,9 +3,9 @@ pragma solidity 0.8.9;
 
 import "hardhat/console.sol";
 import "./PodShipErrors.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
+import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 
 ///// @title PodShip Podcast NFT
 ///// @author ABDul Rehman <devabdee@gmail.com>
@@ -58,7 +58,8 @@ contract PodShip is ERC721URIStorage, Ownable {
     } 
 
     function tipCreator(uint256 _podcastID) external payable {
-        if(msg.value <= MINIMUM_TIP){ revert PodShip__TippingLessThanOneMaticNotAllowed(); }
+        require(podcastId[_podcastID].nftCreator != 0, "Wrong/Non-Existent PodcastID");
+        if(msg.value < MINIMUM_TIP){ revert PodShip__TippingLessThanOneMaticNotAllowed(); }
         (bool sent, ) = (podcastId[_podcastID].nftCreator).call{value: msg.value}("");
         if(!sent){ revert PodShip__FailedToSendMATIC(); }
 
