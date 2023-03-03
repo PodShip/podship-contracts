@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.9;
 
-import "./PodShip.sol";
 import "./PodShipErrors.sol";
 import "hardhat/console.sol";
-import "@openzeppelin/contracts/token/common/ERC2981.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {PodShip} from "./PodShip.sol";
+import {ERC2981} from "@openzeppelin/contracts/token/common/ERC2981.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 ///// @notice PodShip's Auctions core contract
 contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
@@ -47,9 +47,11 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
     event RecentWinner(address indexed recentWinner);
     
     uint256 private platformFee;
+    uint256 public constant MAX_PLATFORM_FEE = 10;
     address private platformFeeRecipient;
 
     constructor(uint256 _platformFee, address _platformFeeRecipient){
+        require(_platformFee <= MAX_PLATFORM_FEE);
         platformFee = _platformFee;
         platformFeeRecipient = _platformFeeRecipient;
     }
@@ -151,10 +153,11 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
     function refundBid(uint256 _auctionId) public nonReentrant {
         if(msg.sender == bidders[_auctionId].highestBidder){ revert PodShipAuction__AuctonWinnerCannotWithdraw();}
         if(bids[msg.sender][_auctionId] == 0){ revert PodShipAuction__UserDidNotParticipatedInTheAuction(); }
-        (bool sent, ) = payable(msg.sender).call{value: bids[msg.sender][_auctionId]}("");
-        if(!sent){ revert PodShipAuction__WithdrawFailed(); }
+        uint256 refundAmount = bids[msg.sender][_auctionId];
         bids[msg.sender][_auctionId] = 0;
-        emit BidRefunded(_auctionId, msg.sender, bids[msg.sender][_auctionId]);
+        (bool sent, ) = payable(msg.sender).call{value: refundAmount}("");
+        if(!sent){ revert PodShipAuction__WithdrawFailed(); }
+        emit BidRefunded(_auctionId, msg.sender, refundAmount);
     }
 
     function withdraw() external onlyOwner {
@@ -163,6 +166,7 @@ contract PodShipAuction is Ownable, PodShip, ERC2981, ReentrancyGuard {
     }
 
     function changePlatformFee(uint256 _platformFee) external onlyOwner {
+        require(_platformFee <= MAX_PLATFORM_FEE);
         platformFee = _platformFee;
         emit PlatformFeeChanged(_platformFee);
     }
